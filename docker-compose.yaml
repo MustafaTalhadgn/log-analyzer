@@ -1,0 +1,20 @@
+services:
+  log-analyzer:
+    build: .
+    image: log-analyzer-cli
+    container_name: log_analyzer
+
+    stdin.open: true 
+    tty: true
+
+    volumes:
+      - /var/log/:/var/log:ro
+      - ./rules.yaml:/app/rules.yaml
+      - ./reports/:/app/reports/
+      # - ./test-logs/:/app/test-logs:ro
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - LOG_FILE_PATH=/var/log
+      - RULES_FILE_PATH=/app/rules.yaml
+      - REPORTS_DIR_PATH=/app/reports
+      - TZ=Europe/Istanbul
