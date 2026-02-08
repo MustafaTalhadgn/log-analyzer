@@ -1,5 +1,5 @@
 rules :
-# # örnek log:Jan 20 14:00:01 server sshd[1234]: Failed password for mustafa from 192.168.1.50 port 22 ssh2
+# örnek log:Jan 20 14:00:01 server sshd[1234]: Failed password for mustafa from 192.168.1.50 port 22 ssh2
 # AUTH LOG Rules
 
 - id: AUTH-001-FAST
@@ -9,8 +9,8 @@ rules :
     type: keyword
     value: "Failed password"
   extract:
-    ip_regex: "from ([0-9.]+)"
-    user_regex: "for (invalid user )?([a-zA-Z0-9_-]+)"
+    ip_regex: "from\\s+([0-9.]+)"
+    user_regex: "for\\s+(?:invalid user\\s+)?([a-zA-Z0-9_-]+)"
   threshold:
     count: 5
     within_seconds: 60
@@ -24,8 +24,8 @@ rules :
     type: keyword
     value: "Failed password"
   extract:
-    ip_regex: "from ([0-9.]+)"
-    user_regex: "for (invalid user )?([a-zA-Z0-9_-]+)"
+    ip_regex: "from\\s+([0-9.]+)"
+    user_regex: "for\\s+(?:invalid user\\s+)?([a-zA-Z0-9_-]+)"
   threshold:
     count: 20
     within_seconds: 3600
@@ -91,7 +91,7 @@ rules :
     type: keyword
     value: "Accepted password for root"
   extract:
-    ip_regex: "from ([0-9.]+)"
+    ip_regex: "from\\s+([0-9.]+)"
   threshold:
     count: 1
     within_seconds: 0
