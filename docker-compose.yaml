@@ -1,20 +1,60 @@
 services:
-  log-analyzer:
-    build: .
-    image: log-analyzer-cli
-    container_name: log_analyzer
-    platform: linux/amd64
-    stdin_open: true 
-    tty: true
 
+  # DB service
+  db:
+    image: postgres:latest
+    container_name: log_analyzer_db
+    environment:
+      POSTGRES_USER: dogan
+      POSTGRES_PASSWORD: dogan
+      POSTGRES_DB: loganalyzer
+    ports:
+      - "5432:5432"
     volumes:
-      # - /var/log/:/var/log:ro
-      - ./rules.yaml:/app/rules.yaml
-      - ./reports/:/app/reports/
-      - ./test-logs/:/var/log:ro
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+        test: ["CMD-SHELL", "pg_isready -U dogan -d loganalyzer"]
+        interval: 10s
+        timeout: 5s
+        retries: 5
+
+  # Backend service
+  backend:
+    build: 
+      context: ./Backend 
+      dockerfile: Dockerfile
+    container_name: log_analyzer_backend
+    restart: on-failure
+    depends_on:
+      db:
+        condition: service_healthy 
+    ports:
+      - "8080:8080" 
+    volumes:
+      - ./Backend/rules.yaml:/app/rules.yaml
+      - ./Backend/reports:/app/reports
+      - ./test-logs:/var/log:ro 
       - /etc/localtime:/etc/localtime:ro
     environment:
       - LOG_FILE_PATH=/var/log
       - RULES_FILE_PATH=/app/rules.yaml
       - REPORTS_DIR_PATH=/app/reports
       - TZ=Europe/Istanbul
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=dogan
+      - DB_PASSWORD=dogan
+      - DB_NAME=loganalyzer
+
+  # Frontend service
+  frontend:
+    build: 
+      context: ./Frontend 
+      dockerfile: Dockerfile
+    container_name: log_analyzer_frontend
+    restart: always
+    depends_on:
+      - backend
+    
+volumes:
+  postgres_data:
