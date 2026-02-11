@@ -1,15 +1,17 @@
 package analyses
 
 import (
+	"log"
 	"log-analyzer/internal/entities"
-	"strings"
-
+	"log-analyzer/internal/repository"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 )
 
 type AnalysisService struct {
+	ruleRepo          *repository.RuleRepository
 	Rules             []entities.Rule
 	alertHistory      map[string][]time.Time
 	matchRegexCache   map[string]*regexp.Regexp
@@ -17,38 +19,58 @@ type AnalysisService struct {
 	mu                sync.Mutex
 }
 
-func NewAnalysisService(rules []entities.Rule) *AnalysisService {
-	analyses := &AnalysisService{
-		Rules:             rules,
+func NewAnalysisService(ruleRepo *repository.RuleRepository) *AnalysisService {
+	service := &AnalysisService{
+		ruleRepo:          ruleRepo,
 		alertHistory:      make(map[string][]time.Time),
 		matchRegexCache:   make(map[string]*regexp.Regexp),
 		extractRegexCache: make(map[string]*regexp.Regexp),
 	}
 
-	for _, rule := range rules {
+	service.ReloadRules()
 
+	return service
+}
+
+func (s *AnalysisService) ReloadRules() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	log.Println(" Kurallar veritabanından yeniden yükleniyor...")
+
+	rules, err := s.ruleRepo.GetAll()
+	if err != nil {
+		log.Printf(" Kurallar yüklenirken hata: %v", err)
+		return
+	}
+
+	s.matchRegexCache = make(map[string]*regexp.Regexp)
+	s.extractRegexCache = make(map[string]*regexp.Regexp)
+	s.Rules = rules
+
+	for _, rule := range rules {
 		if rule.Match.Type == "regex" && rule.Match.Value != "" {
 			re, err := regexp.Compile(rule.Match.Value)
 			if err == nil {
-				analyses.matchRegexCache[rule.RuleId] = re
+				s.matchRegexCache[rule.RuleId] = re
 			}
 		}
 
 		if rule.Extract.IpRegex != "" {
 			re, err := regexp.Compile(rule.Extract.IpRegex)
 			if err == nil {
-				analyses.extractRegexCache[rule.RuleId+"_IP"] = re
+				s.extractRegexCache[rule.RuleId+"_IP"] = re
 			}
 		}
 
 		if rule.Extract.UserRegex != "" {
 			re, err := regexp.Compile(rule.Extract.UserRegex)
 			if err == nil {
-				analyses.extractRegexCache[rule.RuleId+"_User"] = re
+				s.extractRegexCache[rule.RuleId+"_User"] = re
 			}
 		}
 	}
-	return analyses
+	log.Printf("✅ %d adet kural belleğe yüklendi.", len(s.Rules))
 }
 
 func (s *AnalysisService) Analyze(entry *entities.LogEntry) *entities.Alert {
@@ -61,6 +83,7 @@ func (s *AnalysisService) Analyze(entry *entities.LogEntry) *entities.Alert {
 		if !s.isMatch(rule, entry) {
 			continue
 		}
+
 		s.extractDetails(entry, rule)
 		entry.Severity = rule.Severity
 
@@ -78,7 +101,6 @@ func (s *AnalysisService) Analyze(entry *entities.LogEntry) *entities.Alert {
 		}
 	}
 	return nil
-
 }
 
 func (s *AnalysisService) isMatch(rule entities.Rule, entry *entities.LogEntry) bool {

@@ -36,7 +36,7 @@ func ConnectDB() (*gorm.DB, error) {
 			log.Println("Veritabanı bağlantısı başarılı!")
 			break
 		}
-		log.Printf("⏳ Veritabanı bekleniyor (%d/5)... Hata: %v", i, err)
+		log.Printf("Veritabanı bekleniyor  Hata: %v", err)
 		time.Sleep(3 * time.Second)
 	}
 
