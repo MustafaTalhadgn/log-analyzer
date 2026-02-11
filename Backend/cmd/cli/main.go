@@ -1,18 +1,15 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"log"
-	"log-analyzer/internal/entities"
+	"log-analyzer/internal/api"
+	"log-analyzer/internal/api/handlers"
+	"log-analyzer/internal/infrastructure"
 	"log-analyzer/internal/repository"
 	"log-analyzer/internal/service/analyses"
 	"log-analyzer/internal/service/parser"
 	"os"
-	"os/signal"
-	"strings"
-	"sync"
-	"syscall"
 )
 
 type LogTarget struct {
@@ -20,160 +17,90 @@ type LogTarget struct {
 	LogType string
 }
 
-var (
-	rules           []entities.Rule
-	analysisService *analyses.AnalysisService
-	reportWriter    repository.ReportWriter
-	targets         []LogTarget
-)
-
 func main() {
-	initSystem()
+	fmt.Println(" Log Analyzer v2 Başlatılıyor...")
 
-	scanner := bufio.NewScanner(os.Stdin)
+	db, err := infrastructure.ConnectDB()
+	if err != nil {
+		log.Fatalf(" Kritik Hata: Veritabanına bağlanılamadı: %v", err)
+	}
 
-	for {
-		printMenu()
-		fmt.Print("Seçiminiz: ")
+	ruleRepo := repository.NewRuleRepository(db)
+	alertRepo := repository.NewAlertRepository(db)
 
-		if !scanner.Scan() {
-			break
-		}
-		choice := strings.TrimSpace(scanner.Text())
+	rulesPath := getEnv("RULES_FILE_PATH", "/app/rules.yaml")
+	repository.SeedRules(ruleRepo, rulesPath)
 
-		switch choice {
-		case "1":
-			fmt.Println("\n [MOD: 1] Geçmiş Dosya Analizi Başlatılıyor...")
-			runAnalysis(false)
+	analysisService := analyses.NewAnalysisService(ruleRepo)
 
-			fmt.Println("Menüye dönmek için Enter'a basın...")
-			scanner.Scan()
+	go startBackgroundAnalysis(analysisService, alertRepo)
 
-		case "2":
-			fmt.Println("\n  [MOD: 2] Canlı İzleme Modu Başlatılıyor (Durdurmak için Ctrl+C)...")
-			runAnalysis(true)
+	alertHandler := handlers.NewAlertHandler(alertRepo)
+	ruleHandler := handlers.NewRuleHandler(ruleRepo, analysisService)
 
-		case "3":
-			fmt.Println("Çıkış yapılıyor... 👋")
-			os.Exit(0)
+	r := api.SetupRouter(alertHandler, ruleHandler)
 
-		default:
-			fmt.Println("Geçersiz seçim, tekrar deneyin.")
-		}
+	fmt.Println(" API Sunucusu 8080 portunda dinleniyor...")
+
+	if err := r.Run(":8080"); err != nil {
+		log.Fatalf("Sunucu hatası: %v", err)
 	}
 }
 
-func initSystem() {
-	fmt.Println("Siber Güvenlik Log Analizörü Başlatılıyor...")
+func startBackgroundAnalysis(service *analyses.AnalysisService, alertRepo *repository.AlertRepository) {
+	logBaseDir := getEnv("LOG_FILE_PATH", "/var/log")
 
-	rulesPath := getEnv("RULES_FILE_PATH", "/app/rules.yaml")
-	reportPath := getEnv("REPORTS_DIR_PATH", "/app/reports") + "/security_report.csv"
-	logBaseDir := "/var/log"
-
-	ruleRepo := &repository.YamlRuleRepository{FilePath: rulesPath}
-	var err error
-	rules, err = ruleRepo.LoadRules()
-	if err != nil {
-		log.Fatalf("Kurallar yüklenemedi: %v", err)
-	}
-	fmt.Printf(" %d adet kural belleğe yüklendi.\n", len(rules))
-
-	analysisService = analyses.NewAnalysisService(rules)
-	reportWriter = repository.NewCSVReportWriter(reportPath)
-
-	targets = []LogTarget{
+	targets := []LogTarget{
 		{Path: logBaseDir + "/auth.log", LogType: "auth"},
 		{Path: logBaseDir + "/syslog", LogType: "syslog"},
 		{Path: logBaseDir + "/nginx/access.log", LogType: "nginx"},
 		{Path: logBaseDir + "/ufw.log", LogType: "ufw"},
 	}
-}
 
-func printMenu() {
-	fmt.Println("\n============================================")
-	fmt.Println("  LOG ANALYZER - KONTROL PANELİ         ")
-	fmt.Println("============================================")
-	fmt.Println("1.Dosya Bazlı Analiz (Geçmiş Logları Tara ve Raporla)")
-	fmt.Println("2.Gerçek Zamanlı İzleme (Canlı Tailing)")
-	fmt.Println("3.Çıkış")
-	fmt.Println("============================================")
-}
-
-func runAnalysis(follow bool) {
-	var wg sync.WaitGroup
-	stopChan := make(chan struct{})
-
-	summary := entities.NewAnalysisSummary()
-
-	if follow {
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-		go func() {
-			<-sigChan
-			fmt.Println("\n Canlı izleme durduruldu. Menüye dönülüyor...")
-			close(stopChan)
-		}()
-	}
+	fmt.Println(" Log izleme motoru arka planda çalışıyor...")
 
 	for _, target := range targets {
-		wg.Add(1)
-		go func(t LogTarget) {
-			defer wg.Done()
-
-			processLogFile(t, follow, stopChan, summary)
-		}(target)
-	}
-
-	if !follow {
-
-		wg.Wait()
-		fmt.Println("\nAnaliz tamamlandı!")
-
-		summary.PrintReport()
-	} else {
-
-		<-stopChan
+		go processLogFile(target, service, alertRepo)
 	}
 }
 
-func processLogFile(target LogTarget, follow bool, stopChan <-chan struct{}, summary *entities.AnalysisSummary) {
-	logReader := repository.NewLogReader(target.Path, follow)
+func processLogFile(target LogTarget, service *analyses.AnalysisService, alertRepo *repository.AlertRepository) {
+
+	logReader := repository.NewLogReader(target.Path, true)
 	lines, errChan := logReader.ReadLines()
 
 	parserService, err := parser.NewParserService(target.LogType)
 	if err != nil {
-		fmt.Printf(" Parser hatası (%s): %v\n", target.Path, err)
+		fmt.Printf("Parser hatası (%s): %v\n", target.Path, err)
 		return
 	}
 
-	fmt.Printf("   -> İzleniyor: %s\n", target.Path)
+	fmt.Printf("İzleniyor: %s\n", target.Path)
 
 	for {
 		select {
-		case <-stopChan:
-			return
-		case <-errChan:
+		case err := <-errChan:
+			if err != nil {
+
+			}
 		case line, ok := <-lines:
 			if !ok {
 				return
 			}
-
-			summary.AddLine()
 
 			logEntry, err := parserService.ParseLogLine(line)
 			if err != nil {
 				continue
 			}
 
-			alert := analysisService.Analyze(logEntry)
+			alert := service.Analyze(logEntry)
 			if alert != nil {
 
-				summary.AddAlert(alert)
+				fmt.Printf("\n [ALARM] [%s] %s (IP: %s)\n", alert.Severity, alert.Message, alert.SourceIp)
 
-				fmt.Printf("\n🚨 [ALARM] [%s] %s\n", alert.Severity, alert.Message)
-				fmt.Printf("   └── IP: %s | User: %s\n", alert.SourceIp, alert.SourceName)
-
-				reportWriter.WriteAlert(alert)
+				if err := alertRepo.Create(alert); err != nil {
+					fmt.Printf(" Alarm veritabanına yazılamadı: %v\n", err)
+				}
 			}
 		}
 	}

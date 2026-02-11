@@ -11,7 +11,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data_v2:/var/lib/postgresql
     healthcheck:
         test: ["CMD-SHELL", "pg_isready -U dogan -d loganalyzer"]
         interval: 10s
@@ -53,8 +53,10 @@ services:
       dockerfile: Dockerfile
     container_name: log_analyzer_frontend
     restart: always
+    ports:       
+      - "3000:80"
     depends_on:
       - backend
     
 volumes:
-  postgres_data:
+  postgres_data_v2:
