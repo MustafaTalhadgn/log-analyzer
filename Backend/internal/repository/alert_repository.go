@@ -2,12 +2,18 @@ package repository
 
 import (
 	"log-analyzer/internal/entities"
+	"time"
 
 	"gorm.io/gorm"
 )
 
 type AlertRepository struct {
 	db *gorm.DB
+}
+
+type DailyAlertCount struct {
+	Day   time.Time
+	Count int64
 }
 
 func NewAlertRepository(db *gorm.DB) *AlertRepository {
@@ -37,4 +43,22 @@ func (r *AlertRepository) GetSeverityStats() (map[string]int64, error) {
 		stats[r.Severity] = r.Count
 	}
 	return stats, err
+}
+
+func (r *AlertRepository) GetDailyAlertCounts(days int) ([]DailyAlertCount, error) {
+	if days <= 0 {
+		return []DailyAlertCount{}, nil
+	}
+
+	var results []DailyAlertCount
+	err := r.db.Raw(
+		"SELECT date_trunc('day', created_at) AS day, count(*) AS count "+
+			"FROM alerts "+
+			"WHERE created_at >= now() - (? * interval '1 day') "+
+			"GROUP BY day "+
+			"ORDER BY day",
+		days,
+	).Scan(&results).Error
+
+	return results, err
 }
