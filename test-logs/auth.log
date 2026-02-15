@@ -181,3 +181,9 @@ Feb 15 14:30:32 server sshd[9416]: Failed password for root from 192.168.1.144 p
 Feb 15 14:30:33 server sshd[3776]: Failed password for root from 192.168.1.144 port 22 ssh2
 Feb 15 14:30:33 server sshd[3102]: Failed password for root from 192.168.1.144 port 22 ssh2
 Feb 15 14:30:34 server sshd[3898]: Failed password for root from 192.168.1.144 port 22 ssh2
+Feb 15 14:52:13 server sshd[8308]: Failed password for root from 192.168.1.172 port 22 ssh2
+Feb 15 14:52:14 server sshd[1528]: Failed password for root from 192.168.1.172 port 22 ssh2
+Feb 15 14:52:14 server sshd[6519]: Failed password for root from 192.168.1.172 port 22 ssh2
+Feb 15 14:52:15 server sshd[7477]: Failed password for root from 192.168.1.172 port 22 ssh2
+Feb 15 14:52:15 server sshd[7983]: Failed password for root from 192.168.1.172 port 22 ssh2
+Feb 15 14:52:16 server sshd[3929]: Failed password for root from 192.168.1.172 port 22 ssh2

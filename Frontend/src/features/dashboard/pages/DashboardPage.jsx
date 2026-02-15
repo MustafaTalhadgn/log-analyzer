@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, 
   AreaChart, Area, XAxis, YAxis, CartesianGrid 
@@ -10,6 +10,7 @@ import { dashboardService } from '../api/dashboardService';
 import StatCard from '../../../shared/components/StatCards';
 import StatusBadge from '../../../shared/components/StatusBadge';
 import Loading from '../../../shared/components/Loading';
+import { useWebSocket } from '../../../shared/hooks/useWebSocket';
 
 // Grafik Renkleri (Cyberpunk Palette)
 const COLORS = {
@@ -22,7 +23,7 @@ const COLORS = {
 const DashboardPage = () => {
   const [stats, setStats] = useState([]);
   const [alerts, setAlerts] = useState([]);
-    const [activity, setActivity] = useState([]);
+  const [activity, setActivity] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(new Date());
 
@@ -32,8 +33,8 @@ const DashboardPage = () => {
       // Promise.all ile iki isteği aynı anda atıyoruz (Performans!)
             const [statsData, alertsData, dailyStats] = await Promise.all([
         dashboardService.getStats(),
-                dashboardService.getRecentAlerts(),
-                dashboardService.getDailyStats(7)
+              dashboardService.getRecentAlerts(),
+              dashboardService.getDailyStats(7)
       ]);
 
       // 1. Backend verisini Recharts formatına çevir (Object -> Array)
@@ -46,7 +47,7 @@ const DashboardPage = () => {
 
       setStats(formattedStats);
       setAlerts(alertsData);
-    setActivity(dailyStats);
+      setActivity(dailyStats);
       setLastUpdated(new Date());
     } catch (error) {
       console.error("Dashboard verisi çekilemedi:", error);
@@ -56,10 +57,44 @@ const DashboardPage = () => {
   };
 
   // Sayfa açılınca ve her 10 saniyede bir yenile
+  const handleWsMessage = useCallback((payload) => {
+    const data = payload?.type === 'alert' ? payload.data : payload;
+    if (!data || (!data.alert_id && !data.AlertId && !data.rule_id)) {
+      return;
+    }
+
+    const severity = data.severity;
+    const createdAt = data.created_at || data.CreatedAt || new Date().toISOString();
+    const dateObj = new Date(createdAt);
+    const dateKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+
+    setAlerts((prev) => [data, ...prev].slice(0, 100));
+    setStats((prev) => {
+      const next = [...prev];
+      const idx = next.findIndex((item) => item.name === severity);
+      if (idx >= 0) {
+        next[idx] = { ...next[idx], value: next[idx].value + 1 };
+      } else if (severity) {
+        next.push({ name: severity, value: 1 });
+      }
+      return next;
+    });
+    setActivity((prev) => {
+      if (!prev.length) {
+        return prev;
+      }
+      const next = prev.map((item) =>
+        item.date === dateKey ? { ...item, count: item.count + 1 } : item,
+      );
+      return next;
+    });
+    setLastUpdated(new Date());
+  }, []);
+
+  useWebSocket(null, { onMessage: handleWsMessage });
+
   useEffect(() => {
     fetchDashboardData();
-    const interval = setInterval(fetchDashboardData, 10000); 
-    return () => clearInterval(interval);
   }, []);
 
   if (loading) return <Loading />;
