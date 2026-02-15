@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ShieldAlert, Clock, Search, Filter } from 'lucide-react';
 import { alertService } from '../api/alertService';
 import StatusBadge from '../../../shared/components/StatusBadge';
 import Loading from '../../../shared/components/Loading';
+import { useWebSocket } from '../../../shared/hooks/useWebSocket';
 
 const AlertsPage = () => {
   const [alerts, setAlerts] = useState([]);
@@ -21,11 +22,19 @@ const AlertsPage = () => {
     }
   };
 
+  const handleWsMessage = useCallback((payload) => {
+    const data = payload?.type === 'alert' ? payload.data : payload;
+    if (!data || (!data.alert_id && !data.AlertId && !data.rule_id)) {
+      return;
+    }
+
+    setAlerts((prev) => [data, ...prev].slice(0, 200));
+  }, []);
+
+  useWebSocket(null, { onMessage: handleWsMessage });
+
   useEffect(() => {
     fetchAlerts();
-    // Her 10 saniyede bir yenile
-    const interval = setInterval(fetchAlerts, 10000);
-    return () => clearInterval(interval);
   }, []);
 
   // Basit bir filtreleme mantığı
@@ -85,11 +94,13 @@ const AlertsPage = () => {
                    Kayıt bulunamadı.
                  </td>
                </tr>
-            ) : filteredAlerts.map((alert) => (
+            ) : filteredAlerts.map((alert) => {
+              const createdAt = alert.created_at || alert.CreatedAt;
+              return (
               <tr key={alert.ID || Math.random()} className="hover:bg-dark-700/50 transition-colors">
                 <td className="px-6 py-4 flex items-center gap-2 text-slate-400 whitespace-nowrap">
                   <Clock size={14} />
-                  {new Date(alert.created_at).toLocaleString('tr-TR')}
+                  {createdAt ? new Date(createdAt).toLocaleString('tr-TR') : '-'}
                 </td>
                 <td className="px-6 py-4">
                   <StatusBadge status={alert.severity} />
@@ -106,7 +117,8 @@ const AlertsPage = () => {
                    </span>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

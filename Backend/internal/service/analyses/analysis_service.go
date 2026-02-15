@@ -2,6 +2,7 @@ package analyses
 
 import (
 	"log"
+	"log-analyzer/internal/api/websocket"
 	"log-analyzer/internal/entities"
 	"log-analyzer/internal/repository"
 	"regexp"
@@ -12,6 +13,7 @@ import (
 
 type AnalysisService struct {
 	ruleRepo          *repository.RuleRepository
+	wsHub             *websocket.Hub
 	Rules             []entities.Rule
 	alertHistory      map[string][]time.Time
 	matchRegexCache   map[string]*regexp.Regexp
@@ -19,9 +21,10 @@ type AnalysisService struct {
 	mu                sync.Mutex
 }
 
-func NewAnalysisService(ruleRepo *repository.RuleRepository) *AnalysisService {
+func NewAnalysisService(ruleRepo *repository.RuleRepository, wsHub *websocket.Hub) *AnalysisService {
 	service := &AnalysisService{
 		ruleRepo:          ruleRepo,
+		wsHub:             wsHub,
 		alertHistory:      make(map[string][]time.Time),
 		matchRegexCache:   make(map[string]*regexp.Regexp),
 		extractRegexCache: make(map[string]*regexp.Regexp),
@@ -88,7 +91,7 @@ func (s *AnalysisService) Analyze(entry *entities.LogEntry) *entities.Alert {
 		entry.Severity = rule.Severity
 
 		if s.checkThreshold(rule, entry) {
-			return entities.NewAlert(
+			alert := entities.NewAlert(
 				rule.RuleId,
 				rule.Description,
 				rule.Severity,
@@ -98,6 +101,10 @@ func (s *AnalysisService) Analyze(entry *entities.LogEntry) *entities.Alert {
 				entry.RawContent,
 				entry.LogType,
 			)
+			if s.wsHub != nil {
+				s.wsHub.BroadcastAlert(alert)
+			}
+			return alert
 		}
 	}
 	return nil
