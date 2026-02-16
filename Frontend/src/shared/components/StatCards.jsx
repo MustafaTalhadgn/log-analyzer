@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
-const StatCard = ({ title, value, icon: Icon, color, trend }) => {
+const StatCard = ({ title, value, icon: Icon, color, trend, onClick }) => {
   // Renk sınıfları (Tailwind Config'e uygun)
   const colors = {
     blue: "text-cyber-blue bg-cyber-blue/10 border-cyber-blue/20",
@@ -11,9 +11,26 @@ const StatCard = ({ title, value, icon: Icon, color, trend }) => {
   };
 
   const activeColor = colors[color] || colors.blue;
+  const isClickable = typeof onClick === 'function';
+
+  const handleKeyDown = (event) => {
+    if (!isClickable) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onClick();
+    }
+  };
 
   return (
-    <div className="bg-dark-800 border border-dark-700 rounded-xl p-6 shadow-lg hover:border-dark-600 transition-all group">
+    <div
+      className={`bg-dark-800 border border-dark-700 rounded-xl p-6 shadow-lg hover:border-dark-600 transition-all group ${
+        isClickable ? 'cursor-pointer hover:-translate-y-0.5' : ''
+      }`}
+      role={isClickable ? 'button' : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={handleKeyDown}
+    >
       <div className="flex justify-between items-start">
         <div>
           <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">{title}</p>

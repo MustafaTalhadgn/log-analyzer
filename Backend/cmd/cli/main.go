@@ -5,6 +5,7 @@ import (
 	"log"
 	"log-analyzer/internal/api"
 	"log-analyzer/internal/api/handlers"
+	"log-analyzer/internal/api/websocket"
 	"log-analyzer/internal/infrastructure"
 	"log-analyzer/internal/repository"
 	"log-analyzer/internal/service/analyses"
@@ -31,14 +32,17 @@ func main() {
 	rulesPath := getEnv("RULES_FILE_PATH", "/app/rules.yaml")
 	repository.SeedRules(ruleRepo, rulesPath)
 
-	analysisService := analyses.NewAnalysisService(ruleRepo)
+	wsHub := websocket.NewHub()
+	go wsHub.Run()
+
+	analysisService := analyses.NewAnalysisService(ruleRepo, wsHub)
 
 	go startBackgroundAnalysis(analysisService, alertRepo)
 
 	alertHandler := handlers.NewAlertHandler(alertRepo)
 	ruleHandler := handlers.NewRuleHandler(ruleRepo, analysisService)
 
-	r := api.SetupRouter(alertHandler, ruleHandler)
+	r := api.SetupRouter(alertHandler, ruleHandler, wsHub)
 
 	fmt.Println(" API Sunucusu 8080 portunda dinleniyor...")
 
