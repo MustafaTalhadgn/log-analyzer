@@ -4,12 +4,14 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid 
 } from 'recharts';
 import { AlertTriangle, Shield, Activity, Database, Clock, RefreshCw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { dashboardService } from '../api/dashboardService';
 
 // Shared Bileşenlerimizi kullanıyoruz
 import StatCard from '../../../shared/components/StatCards';
 import StatusBadge from '../../../shared/components/StatusBadge';
 import Loading from '../../../shared/components/Loading';
+import AlertReviewButton from '../../../shared/components/AlertReviewButton';
 import { useWebSocket } from '../../../shared/hooks/useWebSocket';
 
 // Grafik Renkleri (Cyberpunk Palette)
@@ -26,6 +28,7 @@ const DashboardPage = () => {
   const [activity, setActivity] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(new Date());
+  const navigate = useNavigate();
 
   // Verileri Çek
   const fetchDashboardData = async () => {
@@ -56,7 +59,7 @@ const DashboardPage = () => {
     }
   };
 
-  // Sayfa açılınca ve her 10 saniyede bir yenile
+
   const handleWsMessage = useCallback((payload) => {
     const data = payload?.type === 'alert' ? payload.data : payload;
     if (!data || (!data.alert_id && !data.AlertId && !data.rule_id)) {
@@ -97,12 +100,16 @@ const DashboardPage = () => {
     fetchDashboardData();
   }, []);
 
-  if (loading) return <Loading />;
-
   // İstatistik Özetleri
   const totalCritical = stats.find(s => s.name === 'CRITICAL')?.value || 0;
   const totalWarnings = stats.find(s => s.name === 'WARNING')?.value || 0;
   const totalLogs = alerts.length; // Şimdilik alarm sayısı, ileride toplam log sayısı backendden gelir
+
+  const getAlertId = useCallback((alert) => (
+    alert?.alert_id || alert?.AlertId || alert?.ID || alert?.id
+  ), []);
+
+  if (loading) return <Loading />;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -111,7 +118,7 @@ const DashboardPage = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Siber Tehdit İstihbarat Paneli</h1>
-          <p className="text-slate-400 text-sm">Dark Web ve Sistem logları üzerinden toplanan verilerin anlık analizi.</p>
+          <p className="text-slate-400 text-sm">Sistem logları üzerinden toplanan verilerin anlık analizi.</p>
         </div>
         <div className="flex items-center gap-3">
             <span className="text-xs text-slate-500">Son Güncelleme: {lastUpdated.toLocaleTimeString()}</span>
@@ -127,10 +134,36 @@ const DashboardPage = () => {
 
       {/* STAT CARDS (GRID) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="TOPLAM İSTİHBARAT" value={totalLogs} icon={Database} color="blue" trend={12} />
-        <StatCard title="KRİTİK TEHDİTLER" value={totalCritical} icon={AlertTriangle} color="red" trend={-5} />
-        <StatCard title="AKTİF UYARILAR" value={totalWarnings} icon={Shield} color="green" />
-        <StatCard title="SON 24 SAAT" value={totalLogs} icon={Activity} color="yellow" />
+        <StatCard
+          title="TOPLAM İSTİHBARAT"
+          value={totalLogs}
+          icon={Database}
+          color="blue"
+          trend={12}
+          onClick={() => navigate('/alerts')}
+        />
+        <StatCard
+          title="KRİTİK TEHDİTLER"
+          value={totalCritical}
+          icon={AlertTriangle}
+          color="red"
+          trend={-5}
+          onClick={() => navigate('/alerts?severity=CRITICAL')}
+        />
+        <StatCard
+          title="AKTİF UYARILAR"
+          value={totalWarnings}
+          icon={Shield}
+          color="green"
+          onClick={() => navigate('/alerts?severity=WARNING')}
+        />
+        <StatCard
+          title="SON 24 SAAT"
+          value={totalLogs}
+          icon={Activity}
+          color="yellow"
+          onClick={() => navigate('/alerts?last24h=1')}
+        />
       </div>
 
       {/* CHARTS AREA */}
@@ -196,7 +229,12 @@ const DashboardPage = () => {
       <div className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden shadow-lg">
         <div className="p-6 border-b border-dark-700 flex justify-between items-center">
             <h3 className="text-white font-bold">Son Tehdit Akışı</h3>
-            <button className="text-xs text-cyber-blue hover:text-blue-400 transition-colors">Tümünü Gör →</button>
+            <button
+              className="text-xs text-cyber-blue hover:text-blue-400 transition-colors"
+              onClick={() => navigate('/alerts')}
+            >
+              Tümünü Gör →
+            </button>
         </div>
         <div className="overflow-x-auto">
             <table className="w-full text-left text-sm text-slate-400">
@@ -213,7 +251,7 @@ const DashboardPage = () => {
                     {alerts.slice(0, 5).map((alert) => {
                       const createdAt = alert.created_at || alert.CreatedAt;
                       return (
-                        <tr key={alert.id || Math.random()} className="hover:bg-dark-700/50 transition-colors group">
+                        <tr key={getAlertId(alert) || Math.random()} className="hover:bg-dark-700/50 transition-colors group">
                             <td className="px-6 py-4 font-medium text-white group-hover:text-cyber-blue transition-colors">
                                 {alert.rule_name || "Bilinmeyen Tehdit"}
                             </td>
@@ -230,9 +268,11 @@ const DashboardPage = () => {
                               {createdAt ? new Date(createdAt).toLocaleString('tr-TR') : '-'}
                             </td>
                             <td className="px-6 py-4 text-right">
-                                <button className="text-xs bg-dark-900 hover:bg-cyber-blue hover:text-white border border-dark-600 text-slate-300 px-3 py-1 rounded transition-all">
-                                    İncele
-                                </button>
+                                <AlertReviewButton
+                                  alert={alert}
+                                  fetchAlerts={dashboardService.getRecentAlerts}
+                                  getAlertId={getAlertId}
+                                />
                             </td>
                         </tr>
                           );
@@ -249,6 +289,7 @@ const DashboardPage = () => {
             </table>
         </div>
       </div>
+
     </div>
   );
 };

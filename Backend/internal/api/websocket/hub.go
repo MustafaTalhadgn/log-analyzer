@@ -57,7 +57,7 @@ func (h *Hub) BroadcastAlert(alert *entities.Alert) {
 	}
 
 	payload := struct {
-		Type string         `json:"type"`
+		Type string          `json:"type"`
 		Data *entities.Alert `json:"data"`
 	}{
 		Type: "alert",
