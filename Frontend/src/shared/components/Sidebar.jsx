@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldAlert, LayoutDashboard, Terminal, Settings, Activity } from 'lucide-react';
+import { ShieldAlert, LayoutDashboard, Terminal, Settings, Activity, FileSearch } from 'lucide-react';
 import { NavLink } from 'react-router-dom'; // Link verme özelliği ekledik
 
 const Sidebar = () => {
@@ -16,6 +16,7 @@ const Sidebar = () => {
         <NavItem to="/" icon={<LayoutDashboard size={20} />} text="Genel Bakış" />
         <NavItem to="/alerts" icon={<Activity size={20} />} text="Tehdit Akışı" />
         <NavItem to="/rules" icon={<Terminal size={20} />} text="Kurallar" />
+        <NavItem to="/offline" icon={<FileSearch size={20} />} text="Offline Analiz" />
         {/* <NavItem to="/logs" icon={<FileText size={20} />} text="Canlı Loglar" /> İleride açarız */}
         <div className="pt-4 mt-4 border-t border-dark-700">
             <NavItem to="/settings" icon={<Settings size={20} />} text="Ayarlar" />

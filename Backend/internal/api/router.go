@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRouter(alertHandler *handlers.AlertHandler, ruleHandler *handlers.RuleHandler, wsHub *websocket.Hub) *gin.Engine {
+func SetupRouter(alertHandler *handlers.AlertHandler, ruleHandler *handlers.RuleHandler, jobHandler *handlers.AnalysisJobHandler, wsHub *websocket.Hub) *gin.Engine {
 	r := gin.Default()
 
 	r.Use(cors.New(cors.Config{
@@ -26,6 +26,8 @@ func SetupRouter(alertHandler *handlers.AlertHandler, ruleHandler *handlers.Rule
 		api.GET("/alerts", alertHandler.GetAlerts)
 		api.GET("/stats", alertHandler.GetStats)
 		api.GET("/stats/daily", alertHandler.GetDailyStats)
+		api.POST("/upload", jobHandler.Upload)
+		api.GET("/jobs", jobHandler.GetJobs)
 
 		api.GET("/rules", ruleHandler.GetRules)
 		api.POST("/rules", ruleHandler.CreateRule)

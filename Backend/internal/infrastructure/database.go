@@ -46,7 +46,7 @@ func ConnectDB() (*gorm.DB, error) {
 
 	//Tablo oluşturma yeri
 	log.Println("🔄 Tablolar oluşturuluyor (Migration)...")
-	err = db.AutoMigrate(&entities.Alert{}, &entities.Rule{})
+	err = db.AutoMigrate(&entities.Alert{}, &entities.Rule{}, &entities.AnalysisJob{})
 	if err != nil {
 		return nil, fmt.Errorf("tablo oluşturma hatası: %w", err)
 	}
