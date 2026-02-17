@@ -9,7 +9,6 @@ import (
 	"log-analyzer/internal/infrastructure"
 	"log-analyzer/internal/repository"
 	"log-analyzer/internal/service/analyses"
-	"log-analyzer/internal/service/parser"
 	"os"
 )
 
@@ -28,6 +27,7 @@ func main() {
 
 	ruleRepo := repository.NewRuleRepository(db)
 	alertRepo := repository.NewAlertRepository(db)
+	jobRepo := repository.NewAnalysisJobRepository(db)
 
 	rulesPath := getEnv("RULES_FILE_PATH", "/app/rules.yaml")
 	repository.SeedRules(ruleRepo, rulesPath)
@@ -41,8 +41,9 @@ func main() {
 
 	alertHandler := handlers.NewAlertHandler(alertRepo)
 	ruleHandler := handlers.NewRuleHandler(ruleRepo, analysisService)
+	jobHandler := handlers.NewAnalysisJobHandler(jobRepo, alertRepo, analysisService)
 
-	r := api.SetupRouter(alertHandler, ruleHandler, wsHub)
+	r := api.SetupRouter(alertHandler, ruleHandler, jobHandler, wsHub)
 
 	fmt.Println(" API Sunucusu 8080 portunda dinleniyor...")
 
@@ -73,40 +74,10 @@ func processLogFile(target LogTarget, service *analyses.AnalysisService, alertRe
 	logReader := repository.NewLogReader(target.Path, true)
 	lines, errChan := logReader.ReadLines()
 
-	parserService, err := parser.NewParserService(target.LogType)
-	if err != nil {
-		fmt.Printf("Parser hatası (%s): %v\n", target.Path, err)
-		return
-	}
-
 	fmt.Printf("İzleniyor: %s\n", target.Path)
-
-	for {
-		select {
-		case err := <-errChan:
-			if err != nil {
-
-			}
-		case line, ok := <-lines:
-			if !ok {
-				return
-			}
-
-			logEntry, err := parserService.ParseLogLine(line)
-			if err != nil {
-				continue
-			}
-
-			alert := service.Analyze(logEntry)
-			if alert != nil {
-
-				fmt.Printf("\n [ALARM] [%s] %s (IP: %s)\n", alert.Severity, alert.Message, alert.SourceIp)
-
-				if err := alertRepo.Create(alert); err != nil {
-					fmt.Printf(" Alarm veritabanına yazılamadı: %v\n", err)
-				}
-			}
-		}
+	ctx := analyses.AnalysisContext{Source: "LIVE", Broadcast: true}
+	if err := service.ProcessLines(lines, errChan, target.LogType, alertRepo, ctx); err != nil {
+		fmt.Printf("Isleme hatasi (%s): %v\n", target.Path, err)
 	}
 }
 

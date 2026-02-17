@@ -18,6 +18,16 @@ func NewAlertHandler(repo *repository.AlertRepository) *AlertHandler {
 }
 
 func (h *AlertHandler) GetAlerts(c *gin.Context) {
+	jobId := c.Query("job_id")
+	if jobId != "" {
+		alerts, err := h.repo.GetByJobID(jobId)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Alarmlar getirilemedi"})
+			return
+		}
+		c.JSON(http.StatusOK, alerts)
+		return
+	}
 
 	alerts, err := h.repo.GetAll(100)
 	if err != nil {

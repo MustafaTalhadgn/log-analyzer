@@ -3,6 +3,8 @@ import MainLayout from '../shared/layouts/MainLayout';
 import DashboardPage from '../features/dashboard/pages/DashboardPage';
 import RulesPage from '../features/rules/pages/RulesPage';
 import AlertsPage from '../features/alerts/pages/AlertsPage';
+import OfflinePage from '../features/offline/pages/OfflinePage';
+import OfflineDetailPage from '../features/offline/pages/OfflineDetailPage';
 // import LogsPage from '../features/logs/pages/LogsPage'; (Sonra yapacağız)
 
 export const router = createBrowserRouter([
@@ -21,6 +23,14 @@ export const router = createBrowserRouter([
       {
         path: 'alerts',
         element: <AlertsPage />,
+      },
+      {
+        path: 'offline',
+        element: <OfflinePage />,
+      },
+      {
+        path: 'offline/:jobId',
+        element: <OfflineDetailPage />,
       },
       // {
       //   path: 'logs',

@@ -30,6 +30,12 @@ func (r *AlertRepository) GetAll(limit int) ([]entities.Alert, error) {
 	return alerts, result.Error
 }
 
+func (r *AlertRepository) GetByJobID(jobId string) ([]entities.Alert, error) {
+	var alerts []entities.Alert
+	result := r.db.Where("analysis_job_id = ?", jobId).Order("created_at desc").Find(&alerts)
+	return alerts, result.Error
+}
+
 func (r *AlertRepository) GetSeverityStats() (map[string]int64, error) {
 	var results []struct {
 		Severity string
