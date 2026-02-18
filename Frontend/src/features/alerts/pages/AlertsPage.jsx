@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ShieldAlert, Clock, Search, Filter, X, List, Calendar, AlertTriangle, Download, CheckCircle2 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { alertService } from '../api/alertService';
@@ -14,6 +14,9 @@ const AlertsPage = () => {
   const [severityFilter, setSeverityFilter] = useState('');
   const [timeFilter, setTimeFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [pulseTick, setPulseTick] = useState(0);
+  const [pulseActive, setPulseActive] = useState(false);
+  const pulseTimeoutRef = useRef(null);
   
   
   // DİKKAT: openAlertId state'ini sildik çünkü modal kendi state'ini yönetecek.
@@ -52,18 +55,36 @@ const AlertsPage = () => {
     }
   }, []);
 
+  const triggerPulse = useCallback(() => {
+    setPulseTick(Date.now());
+    setPulseActive(true);
+    if (pulseTimeoutRef.current) {
+      clearTimeout(pulseTimeoutRef.current);
+    }
+    pulseTimeoutRef.current = setTimeout(() => {
+      setPulseActive(false);
+    }, 800);
+  }, []);
+
   const handleWsMessage = useCallback((payload) => {
     const data = payload?.type === 'alert' ? payload.data : payload;
     if (!data || (!data.alert_id && !data.AlertId && !data.rule_id)) {
       return;
     }
     setAlerts((prev) => [data, ...prev].slice(0, 200));
-  }, []);
+    triggerPulse();
+  }, [triggerPulse]);
 
   useWebSocket(null, { onMessage: handleWsMessage });
 
   useEffect(() => {
     fetchAlerts();
+  }, []);
+
+  useEffect(() => () => {
+    if (pulseTimeoutRef.current) {
+      clearTimeout(pulseTimeoutRef.current);
+    }
   }, []);
 
   const filteredAlerts = useMemo(() => {
@@ -170,6 +191,30 @@ const AlertsPage = () => {
         <div className="flex items-center gap-3">
           <div className="text-slate-500 text-xs font-mono">
              Toplam Kayıt: <span className="text-white font-bold">{filteredAlerts.length}</span> / {alerts.length}
+          </div>
+          <div className="inline-flex items-center rounded-full border border-cyber-blue/30 bg-cyber-blue/10 px-2 py-1">
+            <svg
+              key={pulseTick}
+              className={`h-3 w-10 ${pulseActive ? 'pulse-wave-animate' : ''}`}
+              viewBox="0 0 32 12"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                className="pulse-wave-base"
+                d="M1 6 H8 L11 2 L15 10 L19 4 L23 6 H31"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                className="pulse-wave-path"
+                d="M1 6 H8 L11 2 L15 10 L19 4 L23 6 H31"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </div>
           <div className="flex gap-2">
             <button

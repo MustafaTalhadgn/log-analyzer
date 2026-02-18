@@ -346,6 +346,7 @@ const RulesPage = () => {
                     rule.severity === 'CRITICAL' ? 'text-red-500 bg-red-500/10 border-red-500/20' : 
                     rule.severity === 'HIGH' ? 'text-orange-500 bg-orange-500/10 border-orange-500/20' :
                     rule.severity === 'MEDIUM' ? 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20' :
+                    rule.severity === 'WARNING' ? 'text-amber-400 bg-amber-400/10 border-amber-400/20' :
                     'text-emerald-500 bg-emerald-500/10 border-emerald-500/20'
                   }`}>
                     {rule.severity}

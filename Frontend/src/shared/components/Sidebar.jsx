@@ -1,13 +1,18 @@
 import React from 'react';
-import { ShieldAlert, LayoutDashboard, Terminal, Settings, Activity, FileSearch } from 'lucide-react';
+import { LayoutDashboard, Terminal, Settings, Activity, FileSearch } from 'lucide-react';
 import { NavLink } from 'react-router-dom'; // Link verme özelliği ekledik
+import logoIcon from '../../public/images/icon.png';
 
 const Sidebar = () => {
   return (
     <div className="h-screen w-64 bg-dark-900 border-r border-dark-700 flex flex-col text-slate-300 flex-shrink-0 transition-all duration-300">
       {/* Logo Alanı */}
       <div className="p-6 flex items-center gap-3 border-b border-dark-700">
-        <ShieldAlert className="text-cyber-blue w-8 h-8 animate-pulse" />
+        <img
+          src={logoIcon}
+          alt="Log Analyzer"
+          className="w-8 h-8"
+        />
         <h1 className="text-xl font-bold text-white tracking-wider">LOG ANALYZER</h1>
       </div>
       
@@ -21,18 +26,7 @@ const Sidebar = () => {
 
       </nav>
 
-      {/* Profil Alt Kısım */}
-      <div className="p-4 border-t border-dark-700 bg-dark-800/50">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-cyber-blue to-cyan-400 flex items-center justify-center text-white font-bold shadow-lg">
-            MD
-          </div>
-          <div className="overflow-hidden">
-            <p className="text-sm font-medium text-white truncate">Mustafa Doğan</p>
-            <p className="text-xs text-slate-500 truncate">Senior Analyst</p>
-          </div>
-        </div>
-      </div>
+
     </div>
   );
 };
@@ -50,7 +44,7 @@ const NavItem = ({ icon, text, to }) => (
     }
   >
     <span className="group-hover:scale-110 transition-transform duration-200">{icon}</span>
-    <span className="font-medium">{text}</span>
+    <span className="font-medium inline-flex items-center gap-2">{text}</span>
   </NavLink>
 );
 
