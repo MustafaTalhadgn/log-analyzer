@@ -1,9 +1,14 @@
 package analyses
 
 import (
+	"bufio"
+	"io"
 	"log"
+	"log-analyzer/internal/api/websocket"
 	"log-analyzer/internal/entities"
+	"log-analyzer/internal/logger"
 	"log-analyzer/internal/repository"
+	"log-analyzer/internal/service/parser"
 	"regexp"
 	"strings"
 	"sync"
@@ -12,6 +17,7 @@ import (
 
 type AnalysisService struct {
 	ruleRepo          *repository.RuleRepository
+	wsHub             *websocket.Hub
 	Rules             []entities.Rule
 	alertHistory      map[string][]time.Time
 	matchRegexCache   map[string]*regexp.Regexp
@@ -19,9 +25,17 @@ type AnalysisService struct {
 	mu                sync.Mutex
 }
 
-func NewAnalysisService(ruleRepo *repository.RuleRepository) *AnalysisService {
+type AnalysisContext struct {
+	Source        string
+	AnalysisJobID *string
+	Broadcast     bool
+	StopOnError   bool
+}
+
+func NewAnalysisService(ruleRepo *repository.RuleRepository, wsHub *websocket.Hub) *AnalysisService {
 	service := &AnalysisService{
 		ruleRepo:          ruleRepo,
+		wsHub:             wsHub,
 		alertHistory:      make(map[string][]time.Time),
 		matchRegexCache:   make(map[string]*regexp.Regexp),
 		extractRegexCache: make(map[string]*regexp.Regexp),
@@ -73,7 +87,7 @@ func (s *AnalysisService) ReloadRules() {
 	log.Printf("✅ %d adet kural belleğe yüklendi.", len(s.Rules))
 }
 
-func (s *AnalysisService) Analyze(entry *entities.LogEntry) *entities.Alert {
+func (s *AnalysisService) Analyze(entry *entities.LogEntry, ctx AnalysisContext) *entities.Alert {
 
 	for _, rule := range s.Rules {
 		if entry.LogType != rule.LogType {
@@ -88,7 +102,7 @@ func (s *AnalysisService) Analyze(entry *entities.LogEntry) *entities.Alert {
 		entry.Severity = rule.Severity
 
 		if s.checkThreshold(rule, entry) {
-			return entities.NewAlert(
+			alert := entities.NewAlert(
 				rule.RuleId,
 				rule.Description,
 				rule.Severity,
@@ -97,10 +111,87 @@ func (s *AnalysisService) Analyze(entry *entities.LogEntry) *entities.Alert {
 				entry.LogUser,
 				entry.RawContent,
 				entry.LogType,
+				ctx.Source,
+				ctx.AnalysisJobID,
 			)
+
+			// Log alert creation
+			logger.AlertLogger(alert.AlertId, alert.Severity, alert.RuleName, alert.SourceIp)
+
+			if ctx.Broadcast && s.wsHub != nil {
+				s.wsHub.BroadcastAlert(alert)
+			}
+			return alert
 		}
 	}
 	return nil
+}
+
+func (s *AnalysisService) ProcessLines(lines <-chan string, errChan <-chan error, logType string, alertRepo *repository.AlertRepository, ctx AnalysisContext) error {
+	parserService, err := parser.NewParserService(logType)
+	if err != nil {
+		log.Printf("Parser hatasi (%s): %v", logType, err)
+		return err
+	}
+
+	for lines != nil || errChan != nil {
+		select {
+		case err, ok := <-errChan:
+			if !ok {
+				errChan = nil
+				continue
+			}
+			if err != nil {
+				log.Printf("Satir okuma hatasi: %v", err)
+				if ctx.StopOnError {
+					return err
+				}
+			}
+		case line, ok := <-lines:
+			if !ok {
+				lines = nil
+				continue
+			}
+
+			logEntry, err := parserService.ParseLogLine(line)
+			if err != nil {
+				continue
+			}
+
+			alert := s.Analyze(logEntry, ctx)
+			if alert != nil {
+				if err := alertRepo.Create(alert); err != nil {
+					log.Printf("Alarm veritabanina yazilamadi: %v", err)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func ReadLinesFromReader(reader io.Reader) (<-chan string, <-chan error) {
+	lines := make(chan string)
+	errChan := make(chan error, 1)
+
+	go func() {
+		defer close(lines)
+		defer close(errChan)
+
+		scanner := bufio.NewScanner(reader)
+		buffer := make([]byte, 0, 64*1024)
+		scanner.Buffer(buffer, 1024*1024)
+
+		for scanner.Scan() {
+			lines <- scanner.Text()
+		}
+
+		if err := scanner.Err(); err != nil {
+			errChan <- err
+		}
+	}()
+
+	return lines, errChan
 }
 
 func (s *AnalysisService) isMatch(rule entities.Rule, entry *entities.LogEntry) bool {
