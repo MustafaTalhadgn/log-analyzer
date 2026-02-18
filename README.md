@@ -1,46 +1,101 @@
-docker-compose run --rm log-analyzer
+ # Log Analyzer
 
-Faz 1: Altyapı ve Migrasyon (Infrastructure)
+Gercek zamanli log analizi, alarm uretimi ve gorsel dashboard. Uc katmanli mimari (Go backend + React frontend + izleme stack) ile hem canli akisi hem de offline analizleri yonetir. Bu repo, uretim odakli bir guvenlik log analiz platformunu uctan uca hayata gecirir.
 
-Klasör yapısının yeni (gönderdiğin resimdeki) hale getirilmesi.
+## Neden ilgi cekici?
 
-docker-compose.yml dosyasının güncellenip PostgreSQL servisinin eklenmesi.
+- Gercek zamanli alarmlar: WebSocket uzerinden anlik bildirim.
+- Veri kaliciligi: PostgreSQL ile kalici alert arşivi.
+- Gozden gecirme akisi: Alert review/unreview mantigi.
+- Disari aktarim: CSV ve JSON export.
+- Izlenebilirlik: Prometheus + Grafana + Loki entegre monitoring.
+- Offline analiz: Dosya bazli toplu analiz ve raporlama.
 
-Go modüllerinin yeni yapıya göre düzenlenmesi.
+## Mimari
 
-Faz 2: Veritabanı Katmanı (Backend - Database)
+- Backend (Go): Log parse, kural motoru, alert uretimi, API ve WebSocket.
+- Frontend (React + Vite): Dashboard, alert listesi, durum rozetleri, export.
+- Database (PostgreSQL): Alert ve analiz metadatasi.
+- Observability: Prometheus, Grafana, Loki, Promtail.
 
-PostgreSQL tablolarının tasarlanması (Alerts tablosu).
+## Ozellikler
 
-Go tarafında veritabanı bağlantısının (GORM veya pgx ile) kurulması.
+- Coklu log parser: syslog, nginx, ufw, authlog.
+- Kural tabanli alarm uretimi (rules.yaml).
+- Canli analiz + offline job bazli analiz.
+- Alert review akisi (review/unreview).
+- CSV/JSON export.
+- Gercek zamanli UI guncellemeleri.
 
-Mevcut ReportWriter interface'ine PostgresWriter implementasyonu yazılması. (Artık CSV yerine DB'ye yazacağız).
+## Hizli Baslangic
 
-Faz 3: API Dönüşümü (Backend - API)
+### Gereksinimler
 
-CLI yapısının (main.go içindeki döngünün) kaldırılması.
+- Docker ve Docker Compose
 
-Yerine Gin Framework (veya standart library) ile bir HTTP Server kurulması.
+### Calistirma (Docker)
 
-Log analiz motorunun arka planda (Goroutine olarak) çalışmaya devam etmesi.
+```bash
+docker compose up --build -d
+```
 
-GET /api/alerts gibi endpointlerin yazılması.
+### Servisler
 
-Faz 4: WebSocket Entegrasyonu (Real-time)
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8080
+- Grafana: http://localhost:3001
+- Prometheus: http://localhost:9090
+- Loki: http://localhost:3100
 
-Backend'e WebSocket handler eklenmesi.
+## Kullanim Akisi
 
-Analiz motoru alarm ürettiğinde, bu alarmın WebSocket kanalına gönderilmesi.
+1. Loglar promtail ile toplanir ve loki uzerinden goruntulenebilir.
+2. Backend loglari parse eder, kurallari calistirir ve alert uretir.
+3. Alertler PostgreSQL'e yazilir ve WebSocket ile aninda UI'ya iletilir.
+4. UI uzerinden alertler incelenir, review/unreview yapilir.
+5. Gerektiginde CSV veya JSON olarak disari aktarilir.
 
-Faz 5: Frontend İnşası (React + Vite)
+## API Ozet
+g
+- GET /api/alerts
+- PUT /api/alerts/:alert_id/review
+- PUT /api/alerts/:alert_id/unreview
+- GET /api/alerts/export/:format (csv | json)
 
-React projesinin kurulması.
+## Yapilanlar (v2)
 
-Basit bir Dashboard tasarımı (Navbar, Sidebar, Tablo).
+- Alert review sistemi
+- Alert export (CSV/JSON)
+- WebSocket tabanli gercek zamanli bildirim
+- Monitoring stack (Grafana, Prometheus, Loki)
 
-Backend'den verilerin çekilmesi ve WebSocket dinlenmesi.
+Detayli teknik notlar icin [v2_RELEASE_NOTES.md](v2_RELEASE_NOTES.md) dosyasina bakabilirsiniz.
 
+## Klasor Yapisi
 
+```
+Backend/   # Go backend, API, parser, repository
+Frontend/  # React + Vite UI
+monitoring/# Grafana, Prometheus, Loki konfigurasyonlari
+test-logs/ # Ornek log dosyalari
+```
 
+## Ornek Log Uretimi
 
-olog sistemi 
+```bash
+python generate_logs.py
+```
+
+## Gelistirme Notlari
+
+- Backend konfigurasyonu icin [Backend/rules.yaml](Backend/rules.yaml)
+- Frontend API istemcisi: Frontend/src/shared/api/client.js
+- WebSocket entegrasyonu: Frontend/src/shared/hooks/useWebSocket.js
+
+## Isgorenlere Not
+
+Bu proje, gercek bir guvenlik log analiz akisini uctan uca kurgular: toplama, analiz, alarm, gorsellestirme ve raporlama. Amacim, uretim seviyesinde bir sistem kurup, gercek zamanli veri akisinda stabil calisan, olceklenebilir bir mimariyi gostermekti.
+
+## Lisans
+
+MIT
