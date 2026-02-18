@@ -18,9 +18,7 @@ const Sidebar = () => {
         <NavItem to="/rules" icon={<Terminal size={20} />} text="Kurallar" />
         <NavItem to="/offline" icon={<FileSearch size={20} />} text="Offline Analiz" />
         {/* <NavItem to="/logs" icon={<FileText size={20} />} text="Canlı Loglar" /> İleride açarız */}
-        <div className="pt-4 mt-4 border-t border-dark-700">
-            <NavItem to="/settings" icon={<Settings size={20} />} text="Ayarlar" />
-        </div>
+
       </nav>
 
       {/* Profil Alt Kısım */}

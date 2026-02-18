@@ -17,6 +17,7 @@ type Alert struct {
 	LogContent     string       `json:"log_content"`
 	LogType        string       `json:"log_type"`
 	Source         string       `json:"source" gorm:"index"`
+	Reviewed       bool         `json:"reviewed" gorm:"default:false;index"`
 	AnalysisJobID  *string      `json:"analysis_job_id,omitempty" gorm:"type:uuid;index"`
 	AnalysisJobRef *AnalysisJob `json:"analysis_job,omitempty" gorm:"foreignKey:AnalysisJobID;references:JobId"`
 }

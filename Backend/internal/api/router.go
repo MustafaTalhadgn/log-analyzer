@@ -26,8 +26,12 @@ func SetupRouter(alertHandler *handlers.AlertHandler, ruleHandler *handlers.Rule
 		api.GET("/alerts", alertHandler.GetAlerts)
 		api.GET("/stats", alertHandler.GetStats)
 		api.GET("/stats/daily", alertHandler.GetDailyStats)
+		api.PUT("/alerts/:alert_id/review", alertHandler.MarkAlertReviewed)
+		api.PUT("/alerts/:alert_id/unreview", alertHandler.MarkAlertUnreviewed)
+		api.GET("/alerts/export/:format", alertHandler.ExportAlerts)
 		api.POST("/upload", jobHandler.Upload)
 		api.GET("/jobs", jobHandler.GetJobs)
+		api.DELETE("/jobs/:job_id", jobHandler.DeleteJob)
 
 		api.GET("/rules", ruleHandler.GetRules)
 		api.POST("/rules", ruleHandler.CreateRule)

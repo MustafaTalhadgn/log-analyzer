@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ShieldAlert, Clock, Search, Filter, X, List, Calendar, AlertTriangle } from 'lucide-react';
+import { ShieldAlert, Clock, Search, Filter, X, List, Calendar, AlertTriangle, Download, CheckCircle2 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { alertService } from '../api/alertService';
 import StatusBadge from '../../../shared/components/StatusBadge';
@@ -14,9 +14,11 @@ const AlertsPage = () => {
   const [severityFilter, setSeverityFilter] = useState('');
   const [timeFilter, setTimeFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  
+  
+  // DİKKAT: openAlertId state'ini sildik çünkü modal kendi state'ini yönetecek.
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Filtreleri temizleme fonksiyonu
   const clearFilters = () => {
     setSearchTerm('');
     setSeverityFilter('');
@@ -30,12 +32,25 @@ const AlertsPage = () => {
       setLoading(true);
       const data = await alertService.getAlerts();
       setAlerts(data);
+      return data;
     } catch (err) {
       console.error("Alarmlar çekilemedi:", err);
+      return null;
     } finally {
       setLoading(false);
     }
   };
+
+  const fetchAlertsSilently = useCallback(async () => {
+    try {
+      const data = await alertService.getAlerts();
+      setAlerts(data);
+      return data;
+    } catch (err) {
+      console.error('Alarmlar sessizce cekilemedi:', err);
+      return null;
+    }
+  }, []);
 
   const handleWsMessage = useCallback((payload) => {
     const data = payload?.type === 'alert' ? payload.data : payload;
@@ -96,14 +111,50 @@ const AlertsPage = () => {
   }, [alerts, searchParams, searchTerm, severityFilter, timeFilter, typeFilter]);
 
   const hasActiveFilters = searchTerm || severityFilter || timeFilter || typeFilter;
-
-  // DROPDOWN STYLE: Native select optionlarinda className yerine inline style daha tutarli
   const optionStyle = { backgroundColor: '#0f172a', color: '#e2e8f0' };
+
+  const handleReviewToggle = async (alertId, isCurrentlyReviewed) => {
+    try {
+      if (isCurrentlyReviewed) {
+        await alertService.markAsUnreviewed(alertId);
+      } else {
+        await alertService.markAsReviewed(alertId);
+      }
+      setAlerts((prev) =>
+        prev.map((alert) =>
+          alert.alert_id === alertId || alert.AlertId === alertId
+            ? { ...alert, reviewed: !isCurrentlyReviewed }
+            : alert
+        )
+      );
+    } catch (err) {
+      console.error('Alert review işlemi başarısız:', err);
+    }
+  };
+
+  const handleExport = async (format) => {
+    try {
+      const data = await alertService.exportAlerts(format);
+      const blob = new Blob([data], {
+        type: format === 'csv' ? 'text/csv' : 'application/json',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `alerts_${new Date().toISOString().split('T')[0]}.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Export başarısız:', err);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       
-      {/* HEADER SECTION */}
+      {/* HEADER SECTION (Aynı kaldı) */}
       <div className="flex flex-col md:flex-row justify-between items-end gap-4 pb-2 border-b border-dark-700/50">
         <div>
           <h2 className="text-2xl font-bold text-white flex items-center gap-3">
@@ -116,15 +167,33 @@ const AlertsPage = () => {
             Sistem tarafından yakalanan güvenlik ihlalleri ve anomali kayıtları.
           </p>
         </div>
-        <div className="text-slate-500 text-xs font-mono">
-           Toplam Kayıt: <span className="text-white font-bold">{filteredAlerts.length}</span> / {alerts.length}
+        <div className="flex items-center gap-3">
+          <div className="text-slate-500 text-xs font-mono">
+             Toplam Kayıt: <span className="text-white font-bold">{filteredAlerts.length}</span> / {alerts.length}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleExport('csv')}
+              className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-lg border border-blue-500/20 transition-colors text-xs"
+              title="CSV olarak indir"
+            >
+              <Download size={14} />
+              CSV
+            </button>
+            <button
+              onClick={() => handleExport('json')}
+              className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 hover:bg-green-500/20 text-green-400 rounded-lg border border-green-500/20 transition-colors text-xs"
+              title="JSON olarak indir"
+            >
+              <Download size={14} />
+              JSON
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* FILTERS TOOLBAR */}
+      {/* FILTERS TOOLBAR (Aynı kaldı) */}
       <div className="bg-dark-800/50 border border-dark-700 rounded-xl p-4 flex flex-col xl:flex-row gap-4 justify-between items-center shadow-lg backdrop-blur-sm">
-        
-        {/* Sol Taraf: Arama */}
         <div className="relative w-full xl:w-96 group">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-cyber-blue transition-colors" size={18} />
           <input 
@@ -136,10 +205,7 @@ const AlertsPage = () => {
           />
         </div>
 
-        {/* Sağ Taraf: Dropdownlar ve Reset */}
         <div className="flex flex-col sm:flex-row w-full xl:w-auto gap-3">
-          
-          {/* Kritiklik Filtresi */}
           <div className="relative w-full sm:w-40 ">
             <AlertTriangle className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none " size={16} />
             <select
@@ -147,7 +213,6 @@ const AlertsPage = () => {
               value={severityFilter}
               onChange={(e) => setSeverityFilter(e.target.value)}
             >
-              {/* Option Classları: bg-dark-900 ile arka planı koyu yaptık */}
               <option value="" style={optionStyle}>Tüm Seviyeler</option>
               <option value="CRITICAL" style={optionStyle}>Critical</option>
               <option value="HIGH" style={optionStyle}>High</option>
@@ -158,7 +223,6 @@ const AlertsPage = () => {
             <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">▼</div>
           </div>
 
-          {/* Zaman Filtresi */}
           <div className="relative w-full sm:w-40">
             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={16} />
             <select
@@ -174,7 +238,6 @@ const AlertsPage = () => {
             <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">▼</div>
           </div>
 
-          {/* Log Tipi Filtresi */}
           <div className="relative w-full sm:w-40">
             <List className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={16} />
             <select
@@ -191,7 +254,6 @@ const AlertsPage = () => {
             <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">▼</div>
           </div>
 
-          {/* Temizle Butonu */}
           {hasActiveFilters && (
             <button 
               onClick={clearFilters}
@@ -204,38 +266,46 @@ const AlertsPage = () => {
         </div>
       </div>
 
-      {/* TABLO ALANI */}
       <div className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden shadow-2xl">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-400">
+          <table className="w-full text-left text-sm text-slate-400 table-fixed min-w-[1200px]">
             <thead className="bg-[#0f172a] text-xs uppercase font-semibold text-slate-300 border-b border-dark-600 sticky top-0 z-10">
               <tr>
-                <th className="px-6 py-4 w-40">Zaman</th>
-                <th className="px-6 py-4 w-32">Kritiklik</th>
-                <th className="px-6 py-4 w-64">Kural Adı</th>
-                <th className="px-6 py-4">Mesaj</th>
-                <th className="px-6 py-4 w-48">Kaynak</th>
-                <th className="px-6 py-4 w-24 text-right">İşlem</th>
+                <th className="px-4 py-3 w-48 whitespace-nowrap">Zaman</th>
+                <th className="px-4 py-3 w-32 whitespace-nowrap">Kritiklik</th>
+                <th className="px-4 py-3 w-3/12">Kural Adı</th> 
+                <th className="px-4 py-3 w-4/12">Mesaj</th>     
+                <th className="px-4 py-3 w-40">Kaynak</th>
+                <th className="px-4 py-3 w-32 text-center">Durum</th>
+                <th className="px-4 py-3 w-36 text-center">İncele</th> 
               </tr>
             </thead>
             <tbody className="divide-y divide-dark-700/50 bg-dark-800/50">
               {loading ? (
-                <tr><td colSpan="6" className="py-12"><Loading /></td></tr>
+                <tr><td colSpan="7" className="py-12"><Loading /></td></tr>
               ) : filteredAlerts.length === 0 ? (
                  <tr>
-                   <td colSpan="6" className="px-6 py-12 text-center text-slate-500 flex flex-col items-center justify-center gap-2">
-                     <Filter size={32} className="opacity-20" />
-                     <span>Aradığınız kriterlere uygun kayıt bulunamadı.</span>
-                     <button onClick={clearFilters} className="text-cyber-blue text-xs hover:underline mt-1">
-                       Filtreleri Temizle
-                     </button>
+                   <td colSpan="7" className="px-4 py-12 text-center text-slate-500">
+                     <div className="flex flex-col items-center justify-center gap-2">
+                       <Filter size={32} className="opacity-20" />
+                       <span>Aradığınız kriterlere uygun kayıt bulunamadı.</span>
+                       <button onClick={clearFilters} className="text-cyber-blue text-xs hover:underline mt-1">
+                         Filtreleri Temizle
+                       </button>
+                     </div>
                    </td>
                  </tr>
               ) : filteredAlerts.map((alert) => {
                 const createdAt = alert.created_at || alert.CreatedAt;
+                const rawAlertId = alert.alert_id || alert.AlertId || alert.ID || alert.id;
+                const alertKey = rawAlertId !== null && rawAlertId !== undefined ? String(rawAlertId) : null;
+                
                 return (
-                <tr key={alert.ID || Math.random()} className="hover:bg-dark-700/70 transition-colors group">
-                  <td className="px-6 py-4 whitespace-nowrap">
+                <tr
+                  key={alertKey || Math.random()}
+                  className="hover:bg-dark-700/70 transition-colors group"
+                >
+                  <td className="px-4 py-3 whitespace-nowrap text-xs">
                     <div className="flex items-center gap-2 text-slate-300">
                        <Clock size={14} className="text-slate-500" />
                        <span className="font-mono text-xs">
@@ -243,31 +313,55 @@ const AlertsPage = () => {
                        </span>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-4 py-3">
                     <StatusBadge status={alert.severity} />
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="font-medium text-white truncate max-w-[200px]" title={alert.rule_name}>
+                  <td className="px-4 py-3">
+                    <div className="truncate font-medium text-white" title={alert.rule_name}>
                       {alert.rule_name || "Bilinmeyen"}
                     </div>
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="text-slate-400 max-w-md truncate cursor-help group-hover:text-slate-200 transition-colors" title={alert.message}>
+                  <td className="px-4 py-3">
+                    <div
+                      className="truncate text-slate-400 group-hover:text-slate-200 transition-colors"
+                      title={alert.message}
+                    >
                       {alert.message}
                     </div>
                   </td>
-                  <td className="px-6 py-4">
-                     <div className="flex items-center gap-2">
-                        <span className="bg-dark-900 px-2 py-1 rounded border border-dark-600 text-cyber-blue font-mono text-xs">
-                          {alert.source_ip}
-                        </span>
-                     </div>
+                  <td className="px-4 py-3">
+                     <span className="bg-dark-900 px-2 py-1 rounded border border-dark-600 text-cyber-blue font-mono text-xs whitespace-nowrap">
+                       {alert.source_ip}
+                     </span>
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <AlertReviewButton
-                      alert={alert}
-                      fetchAlerts={alertService.getAlerts}
-                    />
+                 <td className="px-4 py-3 text-center whitespace-nowrap">
+                    {alert.reviewed ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-500/10 text-green-400 border border-green-500/20 text-xs font-medium">
+                        <CheckCircle2 size={12} />
+                        İncelendi
+                      </span>
+                    ) : (
+                      // DEĞİŞEN KISIM: Sarı yerine Mor kullanıldı ve ikon Clock yapıldı
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20 text-xs font-medium">
+                        <Clock size={12} />
+                        Beklemede
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    
+                    {/* DİKKAT: İşlem menüsünü yeniledim. Buton ve Menü yan yana. */}
+                    <div className="flex items-center justify-center">
+                      
+                      {/* Görünür AlertReviewButton (Kendi haline bıraktık) */}
+                      <div id={`review-wrapper-${alertKey}`} onClick={(e) => e.stopPropagation()}>
+                        <AlertReviewButton
+                          alert={alert}
+                          fetchAlerts={fetchAlertsSilently}
+                          onToggleReview={handleReviewToggle}
+                        />
+                      </div>
+                    </div>
                   </td>
                 </tr>
                 );

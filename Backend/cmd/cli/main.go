@@ -1,12 +1,11 @@
 package main
 
 import (
-	"fmt"
-	"log"
 	"log-analyzer/internal/api"
 	"log-analyzer/internal/api/handlers"
 	"log-analyzer/internal/api/websocket"
 	"log-analyzer/internal/infrastructure"
+	"log-analyzer/internal/logger"
 	"log-analyzer/internal/repository"
 	"log-analyzer/internal/service/analyses"
 	"os"
@@ -18,12 +17,21 @@ type LogTarget struct {
 }
 
 func main() {
-	fmt.Println(" Log Analyzer v2 Başlatılıyor...")
+	// Initialize structured logger
+	logger.Init()
+
+	logger.Info("Starting Log Analyzer v2").
+		Str("version", "2.0").
+		Msg("Application startup")
 
 	db, err := infrastructure.ConnectDB()
 	if err != nil {
-		log.Fatalf(" Kritik Hata: Veritabanına bağlanılamadı: %v", err)
+		logger.Fatal("Database connection failed").
+			Err(err).
+			Msg("Critical error")
 	}
+
+	logger.Info("Database connected successfully").Msg("")
 
 	ruleRepo := repository.NewRuleRepository(db)
 	alertRepo := repository.NewAlertRepository(db)
@@ -35,6 +43,8 @@ func main() {
 	wsHub := websocket.NewHub()
 	go wsHub.Run()
 
+	logger.Info("WebSocket hub started").Msg("")
+
 	analysisService := analyses.NewAnalysisService(ruleRepo, wsHub)
 
 	go startBackgroundAnalysis(analysisService, alertRepo)
@@ -45,10 +55,14 @@ func main() {
 
 	r := api.SetupRouter(alertHandler, ruleHandler, jobHandler, wsHub)
 
-	fmt.Println(" API Sunucusu 8080 portunda dinleniyor...")
+	logger.Info("API Server listening").
+		Int("port", 8080).
+		Msg("Server started")
 
 	if err := r.Run(":8080"); err != nil {
-		log.Fatalf("Sunucu hatası: %v", err)
+		logger.Fatal("Server error").
+			Err(err).
+			Msg("Failed to start server")
 	}
 }
 
@@ -62,7 +76,9 @@ func startBackgroundAnalysis(service *analyses.AnalysisService, alertRepo *repos
 		{Path: logBaseDir + "/ufw.log", LogType: "ufw"},
 	}
 
-	fmt.Println(" Log izleme motoru arka planda çalışıyor...")
+	logger.Info("Background log analysis engine started").
+		Int("target_count", len(targets)).
+		Msg("Log monitoring active")
 
 	for _, target := range targets {
 		go processLogFile(target, service, alertRepo)
@@ -74,10 +90,17 @@ func processLogFile(target LogTarget, service *analyses.AnalysisService, alertRe
 	logReader := repository.NewLogReader(target.Path, true)
 	lines, errChan := logReader.ReadLines()
 
-	fmt.Printf("İzleniyor: %s\n", target.Path)
+	logger.Info("Monitoring log file").
+		Str("path", target.Path).
+		Str("type", target.LogType).
+		Msg("Log file watcher started")
+
 	ctx := analyses.AnalysisContext{Source: "LIVE", Broadcast: true}
 	if err := service.ProcessLines(lines, errChan, target.LogType, alertRepo, ctx); err != nil {
-		fmt.Printf("Isleme hatasi (%s): %v\n", target.Path, err)
+		logger.Error("Log processing error").
+			Str("path", target.Path).
+			Err(err).
+			Msg("Failed to process log file")
 	}
 }
 

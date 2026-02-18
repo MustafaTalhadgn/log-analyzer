@@ -1,4 +1,5 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import Loading from './Loading';
 
@@ -12,6 +13,10 @@ const AlertReviewButton = ({
   getAlertId = defaultGetAlertId,
   buttonLabel = 'İncele',
   buttonClassName = 'text-xs bg-dark-900 hover:bg-cyber-blue hover:text-white border border-dark-600 text-slate-300 px-3 py-1 rounded transition-all',
+  openKey = null,
+  alertKey = null,
+  onOpenHandled,
+  onToggleReview,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedAlert, setSelectedAlert] = useState(null);
@@ -20,6 +25,7 @@ const AlertReviewButton = ({
   const navigate = useNavigate();
 
   const openAlertModal = useCallback(async () => {
+    console.debug('[AlertReviewButton] openAlertModal', { alert });
     setIsModalOpen(true);
     setModalLoading(true);
     setModalError('');
@@ -44,7 +50,19 @@ const AlertReviewButton = ({
     setModalLoading(false);
   }, [alert, fetchAlerts, getAlertId]);
 
+  useEffect(() => {
+    if (openKey === null || openKey === undefined) return;
+    if (alertKey === null || alertKey === undefined) return;
+    if (openKey !== alertKey) return;
+    console.debug('[AlertReviewButton] openKey matched', { openKey, alertKey });
+    openAlertModal();
+    if (typeof onOpenHandled === 'function') {
+      onOpenHandled();
+    }
+  }, [alertKey, onOpenHandled, openAlertModal, openKey]);
+
   const closeAlertModal = useCallback(() => {
+    console.debug('[AlertReviewButton] closeAlertModal');
     setIsModalOpen(false);
     setSelectedAlert(null);
     setModalError('');
@@ -54,6 +72,21 @@ const AlertReviewButton = ({
     if (!selectedAlert) return null;
     return selectedAlert.created_at || selectedAlert.CreatedAt || null;
   }, [selectedAlert]);
+
+  const isReviewed = selectedAlert?.reviewed ?? alert?.reviewed;
+
+  const handleToggleReview = useCallback(async () => {
+    if (typeof onToggleReview !== 'function') return;
+    const target = selectedAlert || alert;
+    const targetId = getAlertId(target);
+    if (!targetId) return;
+    try {
+      await onToggleReview(targetId, Boolean(isReviewed));
+      setSelectedAlert((prev) => (prev ? { ...prev, reviewed: !isReviewed } : prev));
+    } catch (error) {
+      console.error('Alert review modal toggle basarisiz:', error);
+    }
+  }, [alert, getAlertId, isReviewed, onToggleReview, selectedAlert]);
 
   const handleFilterBySource = useCallback(() => {
     const sourceIp = selectedAlert?.source_ip;
@@ -68,7 +101,7 @@ const AlertReviewButton = ({
         {buttonLabel}
       </button>
 
-      {isModalOpen && (
+      {isModalOpen && typeof document !== 'undefined' ? createPortal(
         /* 1. DEĞİŞİKLİK: OVERLAY (Arka Plan)
            - bg-black/50: Arkayı %50 karartır.
            - backdrop-blur-sm: Arkayı hafifçe bulanıklaştırır (Tailwind class'ı).
@@ -120,6 +153,18 @@ const AlertReviewButton = ({
                         >
                           Kaynağa göre filtrele
                         </button>
+                        {typeof onToggleReview === 'function' && (
+                          <button
+                            className={`text-xs border px-3 py-1 rounded transition-all ${
+                              isReviewed
+                                ? 'bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-300 border-yellow-500/30'
+                                : 'bg-green-500/10 hover:bg-green-500/20 text-green-300 border-green-500/30'
+                            }`}
+                            onClick={handleToggleReview}
+                          >
+                            {isReviewed ? 'Durumu Geri Al' : 'İncelendi İşaretle'}
+                          </button>
+                        )}
                       </div>
 
                       <div className="space-y-1">
@@ -179,7 +224,7 @@ const AlertReviewButton = ({
             </div>
           </div>
         </div>
-      )}
+      , document.body) : null}
     </>
   );
 };

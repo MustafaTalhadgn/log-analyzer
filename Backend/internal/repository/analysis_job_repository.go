@@ -36,3 +36,12 @@ func (r *AnalysisJobRepository) GetByJobID(jobId string) (*entities.AnalysisJob,
 	}
 	return &job, nil
 }
+
+func (r *AnalysisJobRepository) DeleteByJobID(jobId string) error {
+	// Önce bu job'a ait alertleri sil
+	if err := r.db.Where("analysis_job_id = ?", jobId).Delete(&entities.Alert{}).Error; err != nil {
+		return err
+	}
+	// Sonra job'u sil
+	return r.db.Where("job_id = ?", jobId).Delete(&entities.AnalysisJob{}).Error
+}

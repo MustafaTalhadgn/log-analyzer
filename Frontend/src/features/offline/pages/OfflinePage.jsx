@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { UploadCloud, FileText, Clock, CheckCircle2, XCircle } from 'lucide-react';
+import { UploadCloud, FileText, Clock, CheckCircle2, XCircle, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { offlineService } from '../api/offlineService';
 import Loading from '../../../shared/components/Loading';
@@ -82,6 +82,20 @@ const OfflinePage = () => {
     );
   };
 
+  const handleDeleteJob = async (jobId) => {
+    if (!confirm('Bu işi ve tüm alert geçmişini silmek istediğinize emin misiniz?')) {
+      return;
+    }
+
+    try {
+      await offlineService.deleteJob(jobId);
+      await fetchJobs();
+    } catch (err) {
+      console.error('İş silinemedi:', err);
+      alert('İş silinirken hata oluştu. Tekrar deneyin.');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -152,7 +166,7 @@ const OfflinePage = () => {
                 <th className="px-6 py-4">Dosya Adi</th>
                 <th className="px-6 py-4">Durum</th>
                 <th className="px-6 py-4">Yukleme Tarihi</th>
-                <th className="px-6 py-4 text-right">Detay</th>
+                <th className="px-6 py-4 text-right">İşlemler</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-dark-700">
@@ -167,13 +181,21 @@ const OfflinePage = () => {
                   <td className="px-6 py-4 text-slate-300 font-mono text-xs">
                     {job.upload_date ? new Date(job.upload_date).toLocaleString('tr-TR') : '-'}
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
                     <Link
                       to={`/offline/${job.job_id}`}
-                      className="text-cyber-blue hover:text-blue-400 text-xs"
+                      className="text-cyber-blue hover:text-blue-400 text-xs px-2 py-1 rounded hover:bg-blue-500/10 transition-colors"
                     >
-                      Raporu Gor
+                      Raporu Gör
                     </Link>
+                    <button
+                      onClick={() => handleDeleteJob(job.job_id)}
+                      className="text-red-400 hover:text-red-300 text-xs px-2 py-1 rounded hover:bg-red-500/10 transition-colors flex items-center gap-1"
+                      title="İşi Sil"
+                    >
+                      <Trash2 size={14} />
+                      Sil
+                    </button>
                   </td>
                 </tr>
               ))}
