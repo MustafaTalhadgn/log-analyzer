@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, AlertCircle, CheckCircle, Info } from 'lucide-react';
 import { offlineService } from '../api/offlineService';
 import StatusBadge from '../../../shared/components/StatusBadge';
+import StatCard from '../../../shared/components/StatCards';
 import Loading from '../../../shared/components/Loading';
 
 const OfflineDetailPage = () => {
@@ -26,6 +27,27 @@ const OfflineDetailPage = () => {
     fetchAlerts();
   }, [jobId]);
 
+  // Severity'ye göre alert sayılarını hesapla
+  const stats = useMemo(() => {
+    const severityCounts = {
+      CRITICAL: 0,
+      HIGH: 0,
+      WARNING: 0,
+      MEDIUM: 0,
+      LOW: 0,
+      INFO: 0,
+    };
+
+    alerts.forEach((alert) => {
+      const severity = alert.severity || 'INFO';
+      if (severityCounts.hasOwnProperty(severity)) {
+        severityCounts[severity]++;
+      }
+    });
+
+    return severityCounts;
+  }, [alerts]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -36,6 +58,40 @@ const OfflineDetailPage = () => {
           <h2 className="text-2xl font-bold text-white mt-2">Offline Rapor Detayi</h2>
           <p className="text-slate-400">Job ID: {jobId}</p>
         </div>
+      </div>
+
+      {/* İSTATİSTİK KARTLARI */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <StatCard
+          title="KRİTİK ALARMLAR"
+          value={stats.CRITICAL}
+          icon={AlertTriangle}
+          color="red"
+        />
+        <StatCard
+          title="YÜKSEK SEVİYE"
+          value={stats.HIGH}
+          icon={AlertCircle}
+          color="red"
+        />
+        <StatCard
+          title="UYARILAR"
+          value={stats.WARNING}
+          icon={AlertTriangle}
+          color="yellow"
+        />
+        <StatCard
+          title="ORTA SEVİYE"
+          value={stats.MEDIUM}
+          icon={AlertCircle}
+          color="yellow"
+        />
+        <StatCard
+          title="TOPLAM"
+          value={alerts.length}
+          icon={CheckCircle}
+          color="green"
+        />
       </div>
 
       <div className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden shadow-lg">

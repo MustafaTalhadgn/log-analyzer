@@ -261,3 +261,9 @@ Feb 17 13:54:41 server sshd[7135]: Failed password for root from 192.168.1.108 p
 Feb 17 13:54:42 server sshd[6678]: Failed password for root from 192.168.1.108 port 22 ssh2
 Feb 17 13:54:43 server sshd[3438]: Failed password for root from 192.168.1.108 port 22 ssh2
 Feb 17 13:54:59 server sshd[222]: Accepted password for mustafa from 192.168.1.5 port 5555 ssh2
+Feb 18 11:27:12 server sshd[3380]: Failed password for root from 192.168.1.188 port 22 ssh2
+Feb 18 11:27:13 server sshd[5345]: Failed password for root from 192.168.1.188 port 22 ssh2
+Feb 18 11:27:13 server sshd[6248]: Failed password for root from 192.168.1.188 port 22 ssh2
+Feb 18 11:27:14 server sshd[5920]: Failed password for root from 192.168.1.188 port 22 ssh2
+Feb 18 11:27:14 server sshd[9322]: Failed password for root from 192.168.1.188 port 22 ssh2
+Feb 18 11:27:15 server sshd[5092]: Failed password for root from 192.168.1.188 port 22 ssh2

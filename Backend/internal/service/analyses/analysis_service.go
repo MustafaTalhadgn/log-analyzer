@@ -6,6 +6,7 @@ import (
 	"log"
 	"log-analyzer/internal/api/websocket"
 	"log-analyzer/internal/entities"
+	"log-analyzer/internal/logger"
 	"log-analyzer/internal/repository"
 	"log-analyzer/internal/service/parser"
 	"regexp"
@@ -113,6 +114,10 @@ func (s *AnalysisService) Analyze(entry *entities.LogEntry, ctx AnalysisContext)
 				ctx.Source,
 				ctx.AnalysisJobID,
 			)
+
+			// Log alert creation
+			logger.AlertLogger(alert.AlertId, alert.Severity, alert.RuleName, alert.SourceIp)
+
 			if ctx.Broadcast && s.wsHub != nil {
 				s.wsHub.BroadcastAlert(alert)
 			}

@@ -21,4 +21,9 @@ export const offlineService = {
     const response = await apiClient.get(`/alerts?job_id=${jobId}`);
     return response.data;
   },
+
+  deleteJob: async (jobId) => {
+    const response = await apiClient.delete(`/jobs/${jobId}`);
+    return response.data;
+  },
 };
