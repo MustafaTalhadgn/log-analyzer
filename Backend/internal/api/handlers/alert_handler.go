@@ -20,6 +20,7 @@ func NewAlertHandler(repo *repository.AlertRepository) *AlertHandler {
 func (h *AlertHandler) GetAlerts(c *gin.Context) {
 	jobId := c.Query("job_id")
 	if jobId != "" {
+		// Offline analiz sonuçları: job_id'ye göre filtrele
 		alerts, err := h.repo.GetByJobID(jobId)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Alarmlar getirilemedi"})
@@ -29,7 +30,8 @@ func (h *AlertHandler) GetAlerts(c *gin.Context) {
 		return
 	}
 
-	alerts, err := h.repo.GetAll(100)
+	// Canlı veriler: AnalysisJobID IS NULL
+	alerts, err := h.repo.GetAllLive(100)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Alarmlar getirilemedi"})
 		return
@@ -38,7 +40,8 @@ func (h *AlertHandler) GetAlerts(c *gin.Context) {
 }
 
 func (h *AlertHandler) GetStats(c *gin.Context) {
-	stats, err := h.repo.GetSeverityStats()
+	// Dashboard sadece canlı verilerin istatistikleri alacak
+	stats, err := h.repo.GetSeverityStatsLive()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "İstatistikler alınamadı"})
 		return
@@ -54,7 +57,8 @@ func (h *AlertHandler) GetDailyStats(c *gin.Context) {
 		return
 	}
 
-	results, err := h.repo.GetDailyAlertCounts(days)
+	// Sadece canlı verilerin günlük istatistikleri
+	results, err := h.repo.GetDailyAlertCountsLive(days)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Günlük istatistikler alınamadı"})
 		return

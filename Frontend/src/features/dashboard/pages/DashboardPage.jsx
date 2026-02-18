@@ -28,26 +28,24 @@ const DashboardPage = () => {
   const [activity, setActivity] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [rawStats, setRawStats] = useState({});
   const navigate = useNavigate();
 
   // Verileri Çek
   const fetchDashboardData = async () => {
     try {
-      // Promise.all ile iki isteği aynı anda atıyoruz (Performans!)
-            const [statsData, alertsData, dailyStats] = await Promise.all([
+      const [statsData, alertsData, dailyStats] = await Promise.all([
         dashboardService.getStats(),
-              dashboardService.getRecentAlerts(),
-              dashboardService.getDailyStats(7)
+        dashboardService.getRecentAlerts(),
+        dashboardService.getDailyStats(7)
       ]);
 
-      // 1. Backend verisini Recharts formatına çevir (Object -> Array)
-      // Gelen: { "CRITICAL": 5, "WARNING": 2 }
-      // Çıkan: [ { name: "CRITICAL", value: 5 }, ... ]
-      const formattedStats = Object.keys(statsData).map(key => ({
-        name: key,
-        value: statsData[key]
-      }));
+      const severityKeys = ['CRITICAL', 'WARNING', 'INFO', 'SUCCESS'];
+      const formattedStats = Object.keys(statsData || {})
+        .filter((key) => severityKeys.includes(key))
+        .map((key) => ({ name: key, value: statsData[key] }));
 
+      setRawStats(statsData || {});
       setStats(formattedStats);
       setAlerts(alertsData);
       setActivity(dailyStats);
@@ -58,7 +56,6 @@ const DashboardPage = () => {
       setLoading(false);
     }
   };
-
 
   const handleWsMessage = useCallback((payload) => {
     const data = payload?.type === 'alert' ? payload.data : payload;
@@ -82,6 +79,16 @@ const DashboardPage = () => {
       }
       return next;
     });
+    setRawStats((prev) => {
+      const next = { ...prev };
+      if (typeof next.total_intel === 'number') next.total_intel += 1;
+      if (typeof next.total_alerts === 'number') next.total_alerts += 1;
+      if (typeof next.active_alerts === 'number') next.active_alerts += 1;
+      if (typeof next.last24h === 'number') next.last24h += 1;
+      if (typeof next.last_24h === 'number') next.last_24h += 1;
+      if (severity && typeof next[severity] === 'number') next[severity] += 1;
+      return next;
+    });
     setActivity((prev) => {
       if (!prev.length) {
         return prev;
@@ -100,14 +107,31 @@ const DashboardPage = () => {
     fetchDashboardData();
   }, []);
 
-  // İstatistik Özetleri
-  const totalCritical = stats.find(s => s.name === 'CRITICAL')?.value || 0;
-  const totalWarnings = stats.find(s => s.name === 'WARNING')?.value || 0;
-  const totalLogs = alerts.length; // Şimdilik alarm sayısı, ileride toplam log sayısı backendden gelir
-
   const getAlertId = useCallback((alert) => (
     alert?.alert_id || alert?.AlertId || alert?.ID || alert?.id
   ), []);
+
+  // İstatistik Özetleri
+  const totalCritical = stats.find(s => s.name === 'CRITICAL')?.value || 0;
+  const totalWarnings = stats.find(s => s.name === 'WARNING')?.value || 0;
+  const sumSeverity = stats.reduce((acc, s) => acc + (s.value || 0), 0);
+
+  const totalIntel =
+    rawStats.total_intel ??
+    rawStats.total ??
+    rawStats.total_alerts ??
+    sumSeverity;
+
+  const activeAlerts =
+    rawStats.active_alerts ??
+    rawStats.active ??
+    (totalCritical + totalWarnings);
+
+  const last24h =
+    rawStats.last24h ??
+    rawStats.last_24h ??
+    rawStats.last24 ??
+    totalIntel;
 
   if (loading) return <Loading />;
 
@@ -136,7 +160,7 @@ const DashboardPage = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title="TOPLAM İSTİHBARAT"
-          value={totalLogs}
+          value={totalIntel}
           icon={Database}
           color="blue"
           trend={12}
@@ -152,14 +176,14 @@ const DashboardPage = () => {
         />
         <StatCard
           title="AKTİF UYARILAR"
-          value={totalWarnings}
+          value={activeAlerts}
           icon={Shield}
           color="green"
           onClick={() => navigate('/alerts?severity=WARNING')}
         />
         <StatCard
           title="SON 24 SAAT"
-          value={totalLogs}
+          value={last24h}
           icon={Activity}
           color="yellow"
           onClick={() => navigate('/alerts?last24h=1')}
