@@ -111,3 +111,26 @@ func (r *AlertRepository) GetDailyAlertCounts(days int) ([]DailyAlertCount, erro
 
 	return results, err
 }
+
+// MarkAsReviewed marks an alert as reviewed
+func (r *AlertRepository) MarkAsReviewed(alertId string) error {
+	return r.db.Model(&entities.Alert{}).
+		Where("alert_id = ?", alertId).
+		Update("reviewed", true).Error
+}
+
+// MarkAsUnreviewed marks an alert as unreviewed
+func (r *AlertRepository) MarkAsUnreviewed(alertId string) error {
+	return r.db.Model(&entities.Alert{}).
+		Where("alert_id = ?", alertId).
+		Update("reviewed", false).Error
+}
+
+// GetAllForExport retrieves all live alerts for export (no limit)
+func (r *AlertRepository) GetAllForExport() ([]entities.Alert, error) {
+	var alerts []entities.Alert
+	result := r.db.Where("analysis_job_id IS NULL").
+		Order("created_at desc").
+		Find(&alerts)
+	return alerts, result.Error
+}

@@ -39,3 +39,8 @@ React projesinin kurulması.
 Basit bir Dashboard tasarımı (Navbar, Sidebar, Tablo).
 
 Backend'den verilerin çekilmesi ve WebSocket dinlenmesi.
+
+
+
+
+olog sistemi 
